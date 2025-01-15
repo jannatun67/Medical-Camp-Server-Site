@@ -27,6 +27,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     const MedicalCampsCollection = client.db("Medical-Camp").collection("camps");
+    const UserCollection = client.db("Medical-Camp").collection("users");
 
     // MedicalCamps
     // get
@@ -40,6 +41,12 @@ async function run() {
       const result = await MedicalCampsCollection.find().toArray();
       res.send(result)
     })
+    // post
+    app.post("/medicalCamps",async(req,res)=>{
+      const camp= req.body;
+      const result= await MedicalCampsCollection.insertOne(camp);
+      res.send(result)
+    })
     // details
     app.get("/medicalCamps/:id", async (req, res)=>{
       const id = req.params.id;
@@ -48,7 +55,23 @@ async function run() {
       res.send(result)
     })
 
-
+    // user collection
+    // post
+    app.post("/user/:email",async(req,res)=>{
+      const email = req.params.email;
+      // console.log(email);
+      const query = {email}
+      const user = req.body;
+      // check if user exists in db
+      const isExist = await UserCollection.findOne(query);
+      // console.log(isExist);
+      if (isExist) {
+        return res.send({message:"user already exist", insertedId:null})
+      }
+      const result = await UserCollection.insertOne(user);
+      // console.log(result);
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
