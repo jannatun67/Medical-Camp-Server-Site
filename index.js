@@ -61,6 +61,49 @@ async function run() {
       const result = await MedicalCampsCollection.deleteOne(query);
       res.send(result)
     })
+    // Update
+    const { ObjectId } = require("mongodb");
+
+    app.put("/medicalCamps/:id", async (req, res) => {
+      const id = req.params.id;
+    
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid ID format" });
+      }
+    
+      const query = { _id: new ObjectId(id) };
+      const updateData = req.body;
+      const data = {
+        $set: {
+          campName: updateData.campName,
+          healthcareName: updateData.healthcareName,
+          photo: updateData.photo,
+          campFees: updateData.campFees,
+          location: updateData.location,
+          participantCount: updateData.participantCount,
+          description: updateData.description,
+          date: updateData.date,
+        },
+      };
+    
+      const options = { upsert: true };
+      try {
+        const result = await MedicalCampsCollection.updateOne(query, data, options);
+    
+        if (result.modifiedCount === 0 && result.upsertedCount === 0) {
+          return res.status(404).send({ message: "No document matched the ID provided." });
+        }
+    
+        res.send({
+          message: result.upsertedCount > 0 ? "Document created successfully" : "Document updated successfully",
+          result,
+        });
+      } catch (error) {
+        console.error("Error updating document:", error);
+        res.status(500).send({ error: "Failed to update the document" });
+      }
+    });
+    
 
     // user collection
     // post
