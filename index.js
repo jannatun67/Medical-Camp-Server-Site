@@ -28,6 +28,7 @@ async function run() {
     // await client.connect();
     const MedicalCampsCollection = client.db("Medical-Camp").collection("camps");
     const UserCollection = client.db("Medical-Camp").collection("users");
+    const JoinCampCollection = client.db("Medical-Camp").collection("joinCamp");
 
 
     // jwt related api
@@ -64,6 +65,12 @@ async function run() {
     }
 
     // MedicalCamps
+    // JoinCamp
+    app.post("/JoinCamp",async(req,res)=>{
+      const joinCamp= req.body;
+      const result= await JoinCampCollection.insertOne(joinCamp);
+      res.send(result)
+    })
     // get limit
     app.get("/medicalCamp",async(req,res)=>{
       const result = await MedicalCampsCollection.find().limit(6).toArray();
@@ -156,12 +163,9 @@ async function run() {
       res.send(result)
     })
 
-    app.get("/user/admin/:email",verifyToken,verifyAdmin, async (req,res)=>{
+    app.get("/user/admin/:email", async (req,res)=>{
       const email = req.params.email;
       // console.log(email);
-      if (email !== req.decoded.email ) {
-        return res.status(403).send({message: "forbidden access"})
-      }
       const query = {email:email}
       const user = await UserCollection.findOne(query);
       let admin = false
