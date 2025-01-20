@@ -64,13 +64,18 @@ async function run() {
       next()
     }
 
-    // MedicalCamps
+    
     // JoinCamp
     app.post("/JoinCamp",async(req,res)=>{
       const joinCamp= req.body;
       const result= await JoinCampCollection.insertOne(joinCamp);
       res.send(result)
     })
+    app.get("/JoinCamp",async(req,res)=>{
+      const result = await JoinCampCollection.find().toArray();
+      res.send(result)
+    })
+    // MedicalCamps
     // get limit
     app.get("/medicalCamp",async(req,res)=>{
       const result = await MedicalCampsCollection.find().limit(6).toArray();
