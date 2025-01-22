@@ -31,6 +31,7 @@ async function run() {
     const UserCollection = client.db("Medical-Camp").collection("users");
     const JoinCampCollection = client.db("Medical-Camp").collection("joinCamp");
     const paymentCollection = client.db("Medical-Camp").collection("payments");
+    const feedbackCollection = client.db("Medical-Camp").collection("feedback");
 
 
     // jwt related api
@@ -66,6 +67,13 @@ async function run() {
       next()
     }
 
+    // feedBack
+   app.post("/feedback",async(req,res)=>{
+    const feedBack= req.body;
+    const result = await feedbackCollection.insertOne(feedBack);
+    res.send(result)
+   })
+
     // payment-intent
     app.post("/create-payment-intent", async (req, res) => {
       try {
@@ -92,7 +100,7 @@ async function run() {
       }
   });
 
-  app.get("/payments/:id",async(req,res)=>{
+  app.get("/payments",async(req,res)=>{
     const result = await paymentCollection.find().toArray();
     res.send(result)
   })
@@ -116,19 +124,39 @@ async function run() {
  
   
     // JoinCamp
-    app.post("/JoinCamp",async(req,res)=>{
-      const joinCamp= req.body;
-      const result= await JoinCampCollection.insertOne(joinCamp);
-      const filter= {email:joinCamp.userEmail}
-      const updateDoc= {
-        $inc:{
-          participantCount:1
+  
+    app.post("/JoinCamp", async (req, res) => {
+      try {
+        const joinCamp = req.body;
+        
+        const result = await JoinCampCollection.insertOne(joinCamp);
+    
+        const filter = { _id: new ObjectId(joinCamp.campId) }; 
+        const updateDoc = {
+          $set: {
+            participantCount: joinCamp.participantCount,
+          },
+        };
+    
+        const countCamp = await MedicalCampsCollection.updateOne(filter, updateDoc);
+        console.log(countCamp);
+       
+        if (countCamp.matchedCount === 0) {
+          return res.status(404).send({ message: "Camp not found or could not be updated" });
         }
+    
+        res.status(200).send({
+          message: "Join request successful, and participant count updated",
+          updatedCount: countCamp.modifiedCount,
+        });
+      } catch (error) {
+        console.error("Error in /JoinCamp:", error);
+        res.status(500).send({ message: "Internal server error" });
       }
-      const CountCamp = await MedicalCampsCollection.updateOne(filter,updateDoc)
-      console.log(updateDoc,CountCamp);
-      res.send(result)
-    })
+    });
+    
+
+
     app.get("/JoinCamp",async(req,res)=>{
       const result = await JoinCampCollection.find().toArray();
       res.send(result)
@@ -153,6 +181,7 @@ async function run() {
       const result = await MedicalCampsCollection.find().toArray();
       res.send(result)
     })
+
     // post
     app.post("/medicalCamps",async(req,res)=>{
       const camp= req.body;
@@ -217,21 +246,32 @@ async function run() {
 
     // user collection
     // post
-    app.post("/user/:email",async(req,res)=>{
-      const email = req.params.email;
-      // console.log(email);
-      const query = {email}
-      const user = req.body;
-      // check if user exists in db
-      const isExist = await UserCollection.findOne(query);
-      // console.log(isExist);
-      if (isExist) {
-        return res.send({message:"user already exist", insertedId:null})
+    app.post("/user", async (req, res) => {
+      try {
+        const userInfo = req.body;
+    
+        if (!userInfo?.email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
+    
+        const query = { email: userInfo.email };
+        const isExist = await UserCollection.findOne(query);
+    
+        if (isExist) {
+          return res.status(409).send({ message: "User already exists" });
+        }
+    
+        const result = await UserCollection.insertOne(userInfo);
+        // console.log("User inserted:", result);
+    
+        res.status(201).send(result);
+      } catch (error) {
+        console.error("Error in /user endpoint:", error);
+        res.status(500).send({ message: "Internal server error" });
       }
-      const result = await UserCollection.insertOne(user);
-      // console.log(result);
-      res.send(result)
-    })
+    });
+    
+
     app.get("/user/:email",async(req,res)=>{
       const email = req.params.email;
       // console.log(email);
@@ -240,23 +280,44 @@ async function run() {
       res.send(result)
     })
 
-    app.put("/user/:id",async(req,res)=>{
-      const id= req.params.id;
+    const { ObjectId } = require("mongodb");
 
-      console.log(id);
-        const query = {_id:new ObjectId(id)}
-        // const option= {upsert:true};
-        const updateData= req.body;
-        console.log("hello",updateData);
-        const data = {
-          $set:{
-            ...updateData
-          }
+    app.put("/user/:id", async (req, res) => {
+      const id = req.params.id;
+    
+      // Validate ID format
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid user ID" });
+      }
+    
+      const query = { _id: new ObjectId(id) };
+      const updateData = req.body;
+    
+      // Ensure the request body is not empty
+      if (!updateData || Object.keys(updateData).length === 0) {
+        return res.status(400).send({ message: "No data provided for update" });
+      }
+    
+      const updateDoc = {
+        $set: {
+          ...updateData,
+        },
+      };
+    
+      try {
+        const result = await UserCollection.updateOne(query, updateDoc);
+    
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "User not found" });
         }
-        const result = await UserCollection.updateOne(query,data);
-        res.send(result)
-    })
-
+    
+        res.status(200).send({ message: "User updated successfully", result });
+      } catch (error) {
+        console.error("Error updating user:", error);
+        res.status(500).send({ message: "Internal server error" });
+      }
+    });
+    
     app.get("/user/admin/:email", async (req,res)=>{
       const email = req.params.email;
       // console.log(email);
@@ -268,6 +329,8 @@ async function run() {
       }
       res.send({admin})
     })
+
+    // 
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
