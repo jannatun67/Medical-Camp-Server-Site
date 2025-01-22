@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config(); 
 const app = express();
+const stripe = require("stripe")(process.env.STRIPE_Secret_key);
 const port = process.env.PORT || 5000;
 
 // Middleware
@@ -29,6 +30,7 @@ async function run() {
     const MedicalCampsCollection = client.db("Medical-Camp").collection("camps");
     const UserCollection = client.db("Medical-Camp").collection("users");
     const JoinCampCollection = client.db("Medical-Camp").collection("joinCamp");
+    const paymentCollection = client.db("Medical-Camp").collection("payments");
 
 
     // jwt related api
@@ -64,17 +66,75 @@ async function run() {
       next()
     }
 
-    
+    // payment-intent
+    app.post("/create-payment-intent", async (req, res) => {
+      try {
+          const { totalCampFee } = req.body;
+  
+          if (!totalCampFee || isNaN(totalCampFee) || totalCampFee <= 0) {
+              return res.status(400).send({ error: "Invalid totalCampFee. It must be a positive number." });
+          }
+  
+          const amount = Math.round(totalCampFee * 100);
+  
+          const paymentIntent = await stripe.paymentIntents.create({
+              amount,
+              currency: "usd",
+              payment_method_types: ["card"],
+          });
+  
+          res.send({
+              clientSecret: paymentIntent.client_secret,
+          });
+      } catch (error) {
+          console.error("Error creating payment intent:", error);
+          res.status(500).send({ error: "Internal Server Error" });
+      }
+  });
+  app.post('/payments', async(req,res)=>{
+    const payment= req.body;
+    console.log("payment info",payment);
+    const filter={_id:new ObjectId(payment.campId)}
+    console.log(payment.campId);
+    const updateDoc= {
+      $set:{
+        status:"paid",
+        pendingStatus:"confirmed"
+      }
+    }
+    const update = await JoinCampCollection.updateOne(filter,updateDoc);
+    console.log(update);
+    const paymentResult = await paymentCollection.insertOne(payment);
+    res.send(paymentResult)
+  })
+ 
+  
     // JoinCamp
     app.post("/JoinCamp",async(req,res)=>{
       const joinCamp= req.body;
       const result= await JoinCampCollection.insertOne(joinCamp);
+      const filter= {email:joinCamp.userEmail}
+      const updateDoc= {
+        $inc:{
+          participantCount:1
+        }
+      }
+      const CountCamp = await MedicalCampsCollection.updateOne(filter,updateDoc)
+      console.log(updateDoc,CountCamp);
       res.send(result)
     })
     app.get("/JoinCamp",async(req,res)=>{
       const result = await JoinCampCollection.find().toArray();
       res.send(result)
     })
+
+    app.delete("/JoinCamp/:id",async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)};
+      const result = await JoinCampCollection.deleteOne(query);
+      res.send(result)
+    })
+
     // MedicalCamps
     // get limit
     app.get("/medicalCamp",async(req,res)=>{
@@ -84,7 +144,6 @@ async function run() {
 
     // get
     app.get("/medicalCamps",async(req,res)=>{
-     
       const result = await MedicalCampsCollection.find().toArray();
       res.send(result)
     })
@@ -166,6 +225,30 @@ async function run() {
       const result = await UserCollection.insertOne(user);
       // console.log(result);
       res.send(result)
+    })
+    app.get("/user/:email",async(req,res)=>{
+      const email = req.params.email;
+      // console.log(email);
+      const result = await UserCollection.findOne({ email });
+
+      res.send(result)
+    })
+
+    app.put("/user/:id",async(req,res)=>{
+      const id= req.params.id;
+
+      console.log(id);
+        const query = {_id:new ObjectId(id)}
+        // const option= {upsert:true};
+        const updateData= req.body;
+        console.log("hello",updateData);
+        const data = {
+          $set:{
+            ...updateData
+          }
+        }
+        const result = await UserCollection.updateOne(query,data);
+        res.send(result)
     })
 
     app.get("/user/admin/:email", async (req,res)=>{
