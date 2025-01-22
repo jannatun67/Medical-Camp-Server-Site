@@ -91,6 +91,12 @@ async function run() {
           res.status(500).send({ error: "Internal Server Error" });
       }
   });
+
+  app.get("/payments/:id",async(req,res)=>{
+    const result = await paymentCollection.find().toArray();
+    res.send(result)
+  })
+
   app.post('/payments', async(req,res)=>{
     const payment= req.body;
     console.log("payment info",payment);
