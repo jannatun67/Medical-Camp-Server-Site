@@ -73,6 +73,11 @@ async function run() {
     const result = await feedbackCollection.insertOne(feedBack);
     res.send(result)
    })
+   
+   app.get('/feedback',async(req,res)=>{
+    const result = await feedbackCollection.find().toArray();
+    res.send(result)
+   })
 
     // payment-intent
     app.post("/create-payment-intent", async (req, res) => {
