@@ -25,7 +25,7 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
+    
     // await client.connect();
     const MedicalCampsCollection = client.db("Medical-Camp").collection("camps");
     const UserCollection = client.db("Medical-Camp").collection("users");
@@ -73,7 +73,7 @@ async function run() {
     const result = await feedbackCollection.insertOne(feedBack);
     res.send(result)
    })
-   
+
    app.get('/feedback',async(req,res)=>{
     const result = await feedbackCollection.find().toArray();
     res.send(result)
